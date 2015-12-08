@@ -1,0 +1,22 @@
+set @year:=2559;
+set @ds1:=concat(@year-543-1,'-10-1'),@ds2:=concat(@year-543,'-9-30');
+
+select h.hoscode HospCode,cast(h.hosname as char(200)) HospName,count(*) target,sum(result='Y') result,sum(result='Y')/count(*)*100 percent
+from chospital_amp h
+left join (
+select p.hospcode,p.cid,p.hn,p.pid,concat(p.name,' ',p.lname) ptname
+,group_concat(distinct if(a.diagcode regexp 'E1(1|2|3|4)0|E1(1|2|3|4)1',a.diagcode,null) order by a.diagcode) pdx
+,if(group_concat(distinct if(a.diagcode regexp 'E1(1|2|3|4)0|E1(1|2|3|4)1','Y',null))='Y','Y',null) result 
+from person p
+left join chronic c on c.pid=p.pid and c.hospcode=p.hospcode
+left join card cc on cc.pid=p.pid and cc.hospcode=p.hospcode
+left join diagnosis_ipd a on a.pid=p.pid and a.hospcode=p.hospcode and date(a.datetime_admit) between @ds1 and @ds2 and a.diagtype=1
+where c.chronic between 'E10' and 'E1499'
+and cc.instype_new=0100
+and p.typearea in (1,3)
+and p.nation=099
+and p.discharge=9
+group by p.hospcode,p.pid
+order by result desc
+) a on a.hospcode=h.hoscode
+group by a.hospcode
